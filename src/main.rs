@@ -50,7 +50,7 @@ async fn index(id: i32) -> Result<String, Debug<tokio_postgres::Error>> {
 }
 
 #[launch]
-fn rocket() -> _ {
-    init_db();
+async fn rocket() -> _ {
+    let _ = init_db().await;
     rocket::build().mount("/", routes![index])
 }
