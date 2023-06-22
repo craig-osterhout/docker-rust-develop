@@ -1,9 +1,9 @@
-use rocket::{get,launch, routes};
+use rocket::{get,launch, routes, State};
 use tokio_postgres::{NoTls, Error};
 use rocket::response::Debug;
 use std::env;
 
-async fn init_db() -> Result<(), Error> {
+async fn init_db() -> Result<tokio_postgres::Client, Error> {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let (client, connection) = tokio_postgres::connect(&database_url, NoTls)
         .await?;
@@ -24,19 +24,11 @@ async fn init_db() -> Result<(), Error> {
         "INSERT INTO messages (message) VALUES ($1) ON CONFLICT DO NOTHING",
         &[&"Hello, Docker!"],
     ).await?;
-    Ok(())
+    Ok(client)
 }
 
 #[get("/<id>")]
-async fn index(id: i32) -> Result<String, Debug<tokio_postgres::Error>> {
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let (client, connection) = tokio_postgres::connect(&database_url, NoTls)
-        .await?;
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("Connection error: {}", e);
-        }
-    });
+async fn index(id: i32, client: &State<tokio_postgres::Client>) -> Result<String, Debug<tokio_postgres::Error>> {
     let result = client.query_opt("SELECT message FROM messages WHERE id = $1", &[&id]).await?;
     match result {
       Some(row) => {
@@ -51,6 +43,6 @@ async fn index(id: i32) -> Result<String, Debug<tokio_postgres::Error>> {
 
 #[launch]
 async fn rocket() -> _ {
-    let _ = init_db().await;
-    rocket::build().mount("/", routes![index])
+    let client = init_db().await.unwrap();
+    rocket::build().mount("/", routes![index]).manage(client)
 }
