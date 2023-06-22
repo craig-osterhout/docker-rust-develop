@@ -1,5 +1,5 @@
 use rocket::{get,launch, routes};
-use tokio_postgres::{ NoTls, Error};
+use tokio_postgres::{NoTls, Error};
 use rocket::response::Debug;
 use std::env;
 
@@ -50,7 +50,7 @@ async fn index(id: i32) -> Result<String, Debug<tokio_postgres::Error>> {
 }
 
 #[launch]
-fn rocket() -> _ {
-    init_db();
+async fn rocket() -> _ {
+    let _ = init_db().await;
     rocket::build().mount("/", routes![index])
 }
